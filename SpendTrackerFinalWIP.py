@@ -7,7 +7,7 @@ class BudgetApp:
         self.root.title("Spending Tracker")
 
         # Connect to the database (or create it if it doesn't exist yet)
-        self.conn = sqlite3.connect("userAccounts129.db")
+        self.conn = sqlite3.connect("userAccounts.db")
         self.cursor = self.conn.cursor()
 
         # Create tables if they don't exist yet either
