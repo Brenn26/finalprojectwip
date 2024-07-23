@@ -36,7 +36,7 @@ class BudgetApp:
         self.session_manager = UserSessionManager(self)
 
     def create_tables(self):
-        # Create a table for the user accounts and passord (plaintext for demonstration)
+        # Create a table for the user accounts and password (plaintext for demonstration)
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
@@ -45,7 +45,7 @@ class BudgetApp:
             )
         """)
 
-        # Create a table and column for each users-defined budget category and link it to the user table
+        # Create a table and column for each users defined budget category and link it to the user table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS budgetCategories (
                 id INTEGER PRIMARY KEY,
@@ -64,6 +64,16 @@ class BudgetApp:
                 amount REAL,
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (category_id) REFERENCES budgetCategories(id)
+            )
+        """)
+
+        # Create a table for storing user budgets
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS userBudgets (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER,
+                budget REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
 
@@ -116,7 +126,11 @@ class BudgetApp:
         total_button = tk.Button(self.dashboard_window, text="Show Total", command=lambda: self.amount_manager.show_total(user_id, self.dashboard_window))
         total_button.pack()
 
-        # A Refresh button for testing
+        # Make Button to set the users budget
+        budget_button = tk.Button(self.dashboard_window, text="Set Budget", command=lambda: self.set_user_budget(user_id))
+        budget_button.pack()
+
+        # A Refresh button for clearing the entered values in the entry widgets
         refresh_button = tk.Button(self.dashboard_window, text="Refresh Screen", command=lambda: self.refresh_dashboard(user_id))
         refresh_button.pack()
 
@@ -161,12 +175,33 @@ class BudgetApp:
         print(f"Budget category '{category_name}' created successfully!")
         self.refresh_dashboard(user_id)  # Refresh the dashboard after creating a new category instead of making the user click refresh
 
+    def set_user_budget(self, user_id):
+        # Add the users budget to the table
+        def save_budget():
+            budget = float(budget_entry.get())
+            self.cursor.execute("INSERT INTO userBudgets (user_id, budget) VALUES (?, ?)", (user_id, budget))
+            self.conn.commit()
+            print(f"Budget set to {budget}")
+            budget_window.destroy()
+        #Create Button to save budgete in a new window
+        budget_window = tk.Toplevel(self.dashboard_window)
+        budget_window.title("Set Budget")
+        
+        budget_label = tk.Label(budget_window, text="Enter your budget:")
+        budget_label.pack()
+
+        budget_entry = tk.Entry(budget_window, width=30)
+        budget_entry.pack()
+
+        save_button = tk.Button(budget_window, text="Save Budget", command=save_budget)
+        save_button.pack()
+# Second class to satisfy requirements 
 class CategoryAmountManager:
     def __init__(self, cursor):
         self.cursor = cursor
 
     def save_amount(self, user_id, category, amount):
-        # Save the entered amount for the users sleected category
+        # Save the entered amount for the users selected category
         self.cursor.execute("SELECT id FROM budgetCategories WHERE user_id = ? AND categoryName = ?", (user_id, category))
         category_id = self.cursor.fetchone()[0]
         self.cursor.execute("INSERT INTO categoryAmounts (user_id, category_id, amount) VALUES (?, ?, ?)", (user_id, category_id, amount))
@@ -177,8 +212,17 @@ class CategoryAmountManager:
         # Add up and display the total amount spent across all categories
         self.cursor.execute("SELECT SUM(amount) FROM categoryAmounts WHERE user_id = ?", (user_id,))
         total_amount = self.cursor.fetchone()[0]
-        total_label = tk.Label(window, text=f"Total Amount: {total_amount}")
+        
+        self.cursor.execute("SELECT budget FROM userBudgets WHERE user_id = ?", (user_id,))
+        budget = self.cursor.fetchone()[0]
+        
+        remaining_balance = budget - total_amount
+
+        total_label = tk.Label(window, text=f"Total Amount Spent: {total_amount}")
         total_label.pack()
+
+        remaining_label = tk.Label(window, text=f"Remaining Balance: {remaining_balance}")
+        remaining_label.pack()
 
 # Create third class to handle login and logout
 class UserSessionManager:
